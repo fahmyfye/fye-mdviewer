@@ -7,6 +7,7 @@ a split editor with live preview, and save straight back to the file.
 - Rendered view by default — clean, centered, GitHub CSS
 - **Table-of-contents sidebar** in view mode (h1–h3), scroll-synced; **Contents** button hides it
 - **View / Edit** toggle; Edit is source-left / preview-right with live update
+- **Find & replace** in the editor (`⌘F`) — the source search browsers can't do; view mode keeps native `⌘F`
 - In-place **Save** (button or `⌘S`), atomic write back to the original file
 - **Print / PDF** via the browser print dialog
 - **DOCX export** via pandoc (optional — button is a no-op with a hint if pandoc isn't installed)

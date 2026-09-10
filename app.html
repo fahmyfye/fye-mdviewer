@@ -66,14 +66,42 @@
 
   main { overflow: hidden; min-height: 0; }
   .split { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
+  .editor-pane { display: none; position: relative; height: 100%; min-width: 0; }
   #editor {
-    display: none;
+    display: block;
     height: 100%; width: 100%; resize: none; border: 0; outline: 0;
     padding: 28px 24px; border-right: 1px solid var(--bar-border);
     font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     background: var(--editor-bg); color: var(--editor-fg);
     tab-size: 4;
   }
+
+  /* find & replace (edit mode) */
+  #find {
+    position: absolute; top: 6px; right: 14px; z-index: 5;
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 6px; border: 1px solid var(--bar-border); border-radius: 8px;
+    background: var(--bar-bg); box-shadow: 0 6px 20px rgba(0, 0, 0, .22);
+    font-size: 12px;
+  }
+  #find .row { display: flex; align-items: center; gap: 4px; }
+  #find input {
+    width: 150px; padding: 4px 6px; font: inherit;
+    border: 1px solid var(--btn-border); border-radius: 5px;
+    background: var(--btn-bg); color: inherit;
+  }
+  #find .row:nth-child(2) input { flex: 1; width: auto; }
+  #find button {
+    appearance: none; font: inherit; cursor: pointer; line-height: 1;
+    padding: 4px 7px; border: 1px solid var(--btn-border); border-radius: 5px;
+    background: var(--btn-bg); color: inherit;
+  }
+  #find button.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+  #find .count {
+    min-width: 46px; text-align: center; opacity: .6;
+    font-variant-numeric: tabular-nums;
+  }
+
   .preview-wrap { overflow: auto; height: 100%; }
   .markdown-body {
     box-sizing: border-box; max-width: 820px; margin: 0 auto; padding: 44px 28px;
@@ -119,12 +147,12 @@
 
   /* view mode: single centered column, + optional TOC */
   body[data-mode="view"] .split { grid-template-columns: 1fr; }
-  body[data-mode="view"] #editor { display: none; }
+  body[data-mode="view"] .editor-pane { display: none; }
   body[data-mode="view"]:not(.no-toc) .split.has-toc { grid-template-columns: 244px minmax(0, 1fr); }
   body[data-mode="view"]:not(.no-toc) .split.has-toc #toc { display: block; }
   /* edit mode: two panes */
   body[data-mode="edit"] .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  body[data-mode="edit"] #editor { display: block; }
+  body[data-mode="edit"] .editor-pane { display: block; }
   body[data-mode="edit"] #toc { display: none !important; }
 
   @media print {
@@ -132,7 +160,7 @@
     body { display: block; height: auto; }
     main { overflow: visible; }
     .split { display: block; }
-    #editor, #toc { display: none !important; }
+    .editor-pane, #toc { display: none !important; }
     .preview-wrap { overflow: visible; height: auto; }
     .markdown-body { max-width: none; padding: 0; }
   }
@@ -164,7 +192,24 @@
   <main>
     <div class="split">
       <nav id="toc" aria-label="Table of contents"></nav>
-      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="editor-pane">
+        <textarea id="editor" spellcheck="false"></textarea>
+        <div id="find" hidden>
+          <div class="row">
+            <input id="find-q" type="text" placeholder="Find" spellcheck="false" autocomplete="off">
+            <span class="count" id="find-count">0/0</span>
+            <button id="find-prev" title="Previous (Shift+Enter)">&uarr;</button>
+            <button id="find-next" title="Next (Enter)">&darr;</button>
+            <button id="find-case" title="Match case">Aa</button>
+            <button id="find-close" title="Close (Esc)">&#10005;</button>
+          </div>
+          <div class="row">
+            <input id="find-r" type="text" placeholder="Replace" spellcheck="false" autocomplete="off">
+            <button id="find-rep" title="Replace (Enter)">Replace</button>
+            <button id="find-repall">All</button>
+          </div>
+        </div>
+      </div>
       <div class="preview-wrap"><article class="markdown-body" id="preview"></article></div>
     </div>
   </main>
@@ -184,6 +229,14 @@
   var tocToggle = document.getElementById('toc-toggle');
   var previewWrap = document.querySelector('.preview-wrap');
   var split = document.querySelector('.split');
+  var findBar   = document.getElementById('find');
+  var findQ     = document.getElementById('find-q');
+  var findR     = document.getElementById('find-r');
+  var findCount = document.getElementById('find-count');
+  var findCase  = document.getElementById('find-case');
+  var fMatches  = [];
+  var fIdx      = -1;
+  var fCase     = false;
 
   function escapeHtml(s) {
     return s.replace(/[&<>"]/g, function (c) {
@@ -342,7 +395,7 @@
     try { localStorage.setItem('mdview:mode', m); } catch (e) {}
     refreshTocToggle();
     if (m === 'edit') editor.focus();
-    else setTimeout(updateActiveHeading, 0);
+    else { closeFind(); setTimeout(updateActiveHeading, 0); }
   }
 
   // --- contents toggle ---
@@ -441,6 +494,110 @@
   });
   fetch('/raw').then(function (r) { return r.text(); }).then(function (text) {
     editor.value = text; savedText = text; render(); setDirty(false);
+  });
+
+  // --- find & replace (editor only) ---
+  function openFind() {
+    if (body.dataset.mode !== 'edit') return;
+    findBar.hidden = false;
+    var sel = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+    if (sel && sel.indexOf('\n') === -1) findQ.value = sel;
+    findQ.focus(); findQ.select();
+    scanFind(true);
+  }
+  function closeFind() {
+    if (findBar.hidden) return;
+    findBar.hidden = true;
+    if (body.dataset.mode === 'edit') editor.focus();
+  }
+  function scanFind(jump) {
+    fMatches = [];
+    var needle = findQ.value;
+    if (needle) {
+      var hay = fCase ? editor.value : editor.value.toLowerCase();
+      var pin = fCase ? needle : needle.toLowerCase();
+      var from = 0, at;
+      while ((at = hay.indexOf(pin, from)) !== -1) {
+        fMatches.push([at, at + pin.length]);
+        from = at + pin.length;
+      }
+    }
+    if (!fMatches.length) { fIdx = -1; findCount.textContent = '0/0'; return; }
+    if (fIdx < 0 || fIdx >= fMatches.length) fIdx = 0;
+    if (jump) selectFind(); else paintCount();
+  }
+  function paintCount() {
+    findCount.textContent = fMatches.length ? (fIdx + 1) + '/' + fMatches.length : '0/0';
+  }
+  function selectFind() {
+    if (fIdx < 0 || fIdx >= fMatches.length) return;
+    var m = fMatches[fIdx];
+    editor.focus();
+    editor.setSelectionRange(m[0], m[1]);
+    var line = editor.value.slice(0, m[0]).split('\n').length - 1;
+    var lh = parseFloat(getComputedStyle(editor).lineHeight) || 20;
+    editor.scrollTop = Math.max(0, line * lh - editor.clientHeight / 2);
+    paintCount();
+    findQ.focus();
+  }
+  function stepFind(delta) {
+    if (!fMatches.length) { scanFind(true); return; }
+    fIdx = (fIdx + delta + fMatches.length) % fMatches.length;
+    selectFind();
+  }
+  function replaceFind() {
+    if (fIdx < 0 || fIdx >= fMatches.length) { stepFind(1); return; }
+    var m = fMatches[fIdx];
+    editor.value = editor.value.slice(0, m[0]) + findR.value + editor.value.slice(m[1]);
+    editor.dispatchEvent(new Event('input'));
+    var caret = m[0] + findR.value.length;
+    scanFind(false);
+    fIdx = -1;
+    for (var k = 0; k < fMatches.length; k++) {
+      if (fMatches[k][0] >= caret) { fIdx = k; break; }
+    }
+    if (fIdx === -1 && fMatches.length) fIdx = 0;
+    if (fMatches.length) selectFind(); else findCount.textContent = '0/0';
+  }
+  function replaceAllFind() {
+    scanFind(false);
+    if (!fMatches.length) return;
+    var out = '', last = 0;
+    fMatches.forEach(function (m) { out += editor.value.slice(last, m[0]) + findR.value; last = m[1]; });
+    out += editor.value.slice(last);
+    var n = fMatches.length;
+    editor.value = out;
+    editor.dispatchEvent(new Event('input'));
+    fMatches = []; fIdx = -1;
+    findCount.textContent = 'replaced ' + n;
+  }
+
+  findQ.addEventListener('input', function () { fIdx = 0; scanFind(true); });
+  findQ.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+  });
+  findR.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); replaceFind(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+  });
+  document.getElementById('find-next').addEventListener('click', function () { stepFind(1); });
+  document.getElementById('find-prev').addEventListener('click', function () { stepFind(-1); });
+  document.getElementById('find-rep').addEventListener('click', replaceFind);
+  document.getElementById('find-repall').addEventListener('click', replaceAllFind);
+  document.getElementById('find-close').addEventListener('click', closeFind);
+  findCase.addEventListener('click', function () {
+    fCase = !fCase;
+    findCase.classList.toggle('on', fCase);
+    fIdx = 0; scanFind(true);
+  });
+
+  window.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+      if (body.dataset.mode !== 'edit') return;  // view mode: leave native Cmd+F alone
+      e.preventDefault();
+      openFind();
+    }
   });
 
   // --- keepalive so the local server knows the tab is open ---
