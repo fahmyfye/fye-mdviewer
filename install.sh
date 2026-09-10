@@ -81,7 +81,16 @@ say "app       -> $APP_DIR"
 # --- optional: pandoc for DOCX export ------------------------------------
 if ! command -v pandoc >/dev/null; then
   echo
-  echo "Optional: DOCX export needs pandoc.  brew install pandoc"
+  if [ -t 0 ] && command -v brew >/dev/null; then
+    printf "DOCX export needs pandoc (~280 MB). Install it now? [y/N] "
+    read -r reply
+    case "$reply" in
+      [yY]*) brew install pandoc ;;
+      *) echo "Skipped. Run 'brew install pandoc' later to enable DOCX export." ;;
+    esac
+  else
+    echo "Optional: DOCX export needs pandoc.  brew install pandoc"
+  fi
 fi
 
 echo

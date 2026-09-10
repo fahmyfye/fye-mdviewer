@@ -38,7 +38,7 @@ localhost server instead of a static HTML file.
 - `python3` — the system one at `/usr/bin/python3` works (stdlib only), or
   Homebrew's `python3`
 - `curl` (for `install.sh` only)
-- `pandoc` — **optional**, only for DOCX export: `brew install pandoc`
+- `pandoc` — **optional**, only for DOCX export (`install.sh` offers to install it)
 
 ## Install
 

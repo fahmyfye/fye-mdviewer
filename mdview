@@ -31,6 +31,13 @@ import webbrowser
 from pathlib import Path
 
 ASSETS = (Path.home() / ".local/share/mdview").resolve()
+
+# Launched from the Automator app, PATH is bare (/usr/bin:/bin:...) — make sure
+# Homebrew's bin dirs are visible so tools like pandoc are found.
+for _p in ("/opt/homebrew/bin", "/usr/local/bin", str(Path.home() / ".local/bin")):
+    if os.path.isdir(_p) and _p not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
+
 PANDOC = shutil.which("pandoc")
 REQUIRED_ASSETS = [
     "app.html",
