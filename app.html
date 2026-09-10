@@ -66,6 +66,9 @@
   .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
   .btn:disabled { opacity: .5; cursor: default; }
   #toc-toggle[aria-pressed="false"] { opacity: .5; }
+  #find-toggle[aria-pressed="true"] {
+    background: var(--accent); color: var(--accent-fg); border-color: transparent;
+  }
   select.btn { padding-right: 6px; }
 
   main { overflow: hidden; min-height: 0; }
@@ -91,6 +94,7 @@
     box-shadow: 0 6px 20px rgba(0, 0, 0, .22);
     font-size: 12px;
   }
+  #find[hidden] { display: none; }
   #find .row { display: flex; align-items: center; gap: 4px; }
   #find input {
     width: 150px; padding: 4px 6px; font: inherit;
@@ -192,6 +196,7 @@
       </select>
     </label>
     <button class="btn" id="toc-toggle" aria-pressed="true" hidden>Contents</button>
+    <button class="btn" id="find-toggle" hidden>Find</button>
     <button class="btn" id="docx">DOCX</button>
     <button class="btn" id="print">Print / PDF</button>
     <button class="btn primary" id="save" disabled>Saved</button>
@@ -237,7 +242,8 @@
   var tocToggle = document.getElementById('toc-toggle');
   var previewWrap = document.querySelector('.preview-wrap');
   var split = document.querySelector('.split');
-  var findBar   = document.getElementById('find');
+  var findBar    = document.getElementById('find');
+  var findToggle = document.getElementById('find-toggle');
   var findQ     = document.getElementById('find-q');
   var findR     = document.getElementById('find-r');
   var findCount = document.getElementById('find-count');
@@ -403,6 +409,7 @@
     });
     try { localStorage.setItem('mdview:mode', m); } catch (e) {}
     refreshTocToggle();
+    findToggle.hidden = (m !== 'edit');
     if (m === 'edit') editor.focus();
     else { closeFind(); setTimeout(updateActiveHeading, 0); }
   }
@@ -517,6 +524,7 @@
   function openFind() {
     if (body.dataset.mode !== 'edit') return;
     findBar.hidden = false;
+    findToggle.setAttribute('aria-pressed', 'true');
     var sel = editor.value.substring(editor.selectionStart, editor.selectionEnd);
     if (sel && sel.indexOf('\n') === -1) findQ.value = sel;
     findQ.focus(); findQ.select();
@@ -524,6 +532,7 @@
     scanFind(false);
   }
   function closeFind() {
+    findToggle.setAttribute('aria-pressed', 'false');
     if (findBar.hidden) return;
     findBar.hidden = true;
     if (body.dataset.mode === 'edit') editor.focus();
@@ -613,6 +622,10 @@
   document.getElementById('find-rep').addEventListener('click', replaceFind);
   document.getElementById('find-repall').addEventListener('click', replaceAllFind);
   document.getElementById('find-close').addEventListener('click', closeFind);
+  findToggle.addEventListener('click', function () {
+    if (findBar.hidden) openFind();
+    else closeFind();
+  });
   findCase.addEventListener('click', function () {
     fCase = !fCase;
     findCase.classList.toggle('on', fCase);
