@@ -121,6 +121,7 @@
         <option value='ui-monospace, Menlo, Consolas, monospace'>Mono</option>
       </select>
     </label>
+    <button class="btn" id="docx">DOCX</button>
     <button class="btn" id="print">Print / PDF</button>
     <button class="btn primary" id="save" disabled>Saved</button>
   </div>
@@ -275,10 +276,39 @@
 
   document.getElementById('print').addEventListener('click', function () { window.print(); });
 
+  // --- DOCX export (server-side pandoc) ---
+  var docxBtn = document.getElementById('docx');
+  var docxName = 'document.docx';
+  docxBtn.addEventListener('click', function () {
+    var label = docxBtn.textContent;
+    docxBtn.disabled = true; docxBtn.textContent = 'Exporting…';
+    fetch('/export.docx', {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: editor.value
+    }).then(function (r) {
+      if (r.status === 501) {
+        return r.text().then(function (msg) { throw new Error(msg); });
+      }
+      if (!r.ok) return r.text().then(function (msg) { throw new Error(msg || ('HTTP ' + r.status)); });
+      return r.blob();
+    }).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = docxName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }).catch(function (err) {
+      alert('DOCX export failed:\n\n' + err.message);
+    }).then(function () {
+      docxBtn.disabled = false; docxBtn.textContent = label;
+    });
+  });
+
   // --- load ---
   fetch('/meta').then(function (r) { return r.json(); }).then(function (m) {
     document.getElementById('fname').textContent = m.name;
     document.title = m.name + ' — mdview';
+    docxName = m.name.replace(/\.(md|markdown|mdown|mkd)$/i, '') + '.docx';
+    if (!m.docx) docxBtn.title = 'Install pandoc for DOCX export:  brew install pandoc';
   });
   fetch('/raw').then(function (r) { return r.text(); }).then(function (text) {
     editor.value = text; savedText = text; render(); setDirty(false);

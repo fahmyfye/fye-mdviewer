@@ -78,6 +78,12 @@ end run
 ' >/dev/null
 say "app       -> $APP_DIR"
 
+# --- optional: pandoc for DOCX export ------------------------------------
+if ! command -v pandoc >/dev/null; then
+  echo
+  echo "Optional: DOCX export needs pandoc.  brew install pandoc"
+fi
+
 echo
 echo "Done."
 case ":$PATH:" in
