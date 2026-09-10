@@ -1,0 +1,9 @@
+# vendored libraries fetched by install.sh
+marked.min.js
+highlight.min.js
+hljs-*.css
+github-markdown.css
+mermaid.min.js
+katex/
+*.mdview.tmp
+.DS_Store
