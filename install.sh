@@ -69,8 +69,7 @@ rm -rf "$APP_DIR"
 osacompile -o "$APP_DIR" -e '
 on open theFiles
   repeat with f in theFiles
-    set p to POSIX path of f
-    do shell script "$HOME/bin/mdview " & quoted form of p & " > /dev/null 2>&1 &"
+    do shell script "$HOME/bin/mdview " & quoted form of (POSIX path of f)
   end repeat
 end open
 on run

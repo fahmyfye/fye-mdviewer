@@ -11,7 +11,7 @@ a split editor with live preview, and save straight back to the file.
 - Syntax highlighting (highlight.js), **Mermaid** diagrams, **KaTeX** math
 - Font switcher (System / Georgia / Charter / Helvetica / Mono)
 - 100% offline — every library is vendored locally, no network calls at runtime
-- The local server shuts itself down ~12s after you close the tab
+- The local server detaches on launch and shuts itself down ~12s after you close the tab
 
 ## How it works
 
@@ -58,12 +58,55 @@ If `~/bin` isn't on your `PATH`, add it:
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
 ```
 
-## Set `.md` files to open with it
+## Open `.md` files on double-click (Automator app)
 
-Finder → right-click any `.md` → **Get Info** → **Open with** →
-**MarkdownViewer.app** → **Change All…**
+macOS won't let you set a shell script as a file handler, so `mdview` is wrapped
+in a tiny app that Finder can associate with `.md` files.
 
-Now double-clicking a `.md` opens the viewer.
+`install.sh` builds this for you at **`~/Applications/MarkdownViewer.app`** — an
+AppleScript "droplet" that runs `mdview` on whatever files you open with it.
+
+Then, in Finder:
+
+1. right-click any `.md` file → **Get Info**
+2. under **Open with**, choose **MarkdownViewer.app**
+3. click **Change All…** and confirm
+
+Double-clicking a `.md` now opens it in the viewer.
+
+### Build the app by hand instead
+
+If you'd rather not run `install.sh`, create it with Automator:
+
+1. **Automator** → **New Document** → **Application**
+2. add the **Run Shell Script** action
+3. set **Pass input:** to **as arguments**
+4. replace the body with:
+   ```bash
+   for f in "$@"; do
+     "$HOME/bin/mdview" "$f"
+   done
+   ```
+5. **File → Save…** → name it `MarkdownViewer`, save to `~/Applications`
+
+Or from the command line (what `install.sh` runs):
+
+```bash
+osacompile -o ~/Applications/MarkdownViewer.app -e '
+on open theFiles
+  repeat with f in theFiles
+    do shell script "$HOME/bin/mdview " & quoted form of (POSIX path of f)
+  end repeat
+end open'
+```
+
+### If double-click stops working after an update
+
+macOS caches app registrations. Re-register the app:
+
+```bash
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/Applications/MarkdownViewer.app
+```
 
 ## Use from the terminal
 
@@ -71,8 +114,15 @@ Now double-clicking a `.md` opens the viewer.
 mdview README.md
 ```
 
-Press `Ctrl+C` in that terminal to stop the server immediately (otherwise it
-exits on its own shortly after the tab closes).
+By default `mdview` detaches and returns to the prompt immediately; the server
+stops ~12s after you close the browser tab. To force it: `pkill -f 'mdview'`.
+
+Pass `--foreground` (`-f`) to keep it in the foreground and stop it with
+`Ctrl+C`:
+
+```bash
+mdview -f README.md
+```
 
 ## Updating the libraries
 

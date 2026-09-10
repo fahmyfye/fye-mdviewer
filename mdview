@@ -7,8 +7,12 @@ mdview — local Markdown viewer/editor.
 Opens a browser tab served from 127.0.0.1 on a random port. Default is a
 read-only rendered view; the "Edit" toggle opens a split editor with live
 preview and in-place Save (writes back to the original file). Fully offline —
-all JS/CSS is served from ~/.local/share/mdview. The server shuts itself down
-a few seconds after the tab is closed.
+all JS/CSS is served from ~/.local/share/mdview.
+
+By default the server detaches from the calling process (so it survives the
+Automator app / shell that launched it) and shuts itself down a few seconds
+after the tab is closed. Pass --foreground (-f) to keep it attached and stop
+it with Ctrl+C.
 """
 
 import http.server
@@ -151,14 +155,36 @@ def watchdog():
             os._exit(0)
 
 
+def daemonize():
+    """Detach from the launching shell / Automator app so the server keeps
+    running after the caller exits. Double-fork, new session, std fds -> /dev/null."""
+    if os.fork() > 0:
+        os._exit(0)
+    os.setsid()
+    if os.fork() > 0:
+        os._exit(0)
+    devnull = os.open(os.devnull, os.O_RDWR)
+    for fd in (0, 1, 2):
+        os.dup2(devnull, fd)
+
+
 def main():
+    foreground = "--foreground" in sys.argv or "-f" in sys.argv
+
     httpd = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Handler)
     httpd.daemon_threads = True
     port = httpd.server_address[1]
     url = f"http://127.0.0.1:{port}/"
 
+    if foreground:
+        print(f"mdview  {SRC.name}  →  {url}  (Ctrl+C to stop)")
+    else:
+        print(f"mdview  {SRC.name}  →  {url}")
+        print(f"        stops when you close the tab  ·  force: pkill -f 'mdview {SRC.name}'")
+        sys.stdout.flush()
+        daemonize()
+
     threading.Thread(target=watchdog, daemon=True).start()
-    print(f"mdview  {SRC.name}  →  {url}  (Ctrl+C to stop)")
     webbrowser.open(url)
     try:
         httpd.serve_forever()
