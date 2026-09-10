@@ -396,7 +396,11 @@
   // --- mode toggle ---
   var stored = null;
   try { stored = localStorage.getItem('mdview:mode'); } catch (e) {}
-  setMode(stored === 'edit' ? 'edit' : 'view');
+  var q = new URLSearchParams(location.search);
+  var startMode = q.has('edit') || q.get('mode') === 'edit' ? 'edit'
+                : q.has('view') || q.get('mode') === 'view' ? 'view'
+                : (stored === 'edit' ? 'edit' : 'view');
+  setMode(startMode);
 
   document.getElementById('mode').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;

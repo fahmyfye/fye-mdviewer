@@ -4,6 +4,8 @@ A local Markdown **viewer + editor** for macOS. Double-click a `.md` file and it
 opens in your browser, rendered with GitHub styling. Flip the **Edit** toggle for
 a split editor with live preview, and save straight back to the file.
 
+![mdview in edit mode — Markdown source on the left, live preview on the right](docs/screenshot.png)
+
 - Rendered view by default — clean, centered, GitHub CSS
 - **Table-of-contents sidebar** in view mode (h1–h3), scroll-synced; **Contents** button hides it
 - **View / Edit** toggle; Edit is source-left / preview-right with live update
@@ -113,11 +115,23 @@ macOS caches app registrations. Re-register the app:
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/Applications/MarkdownViewer.app
 ```
 
+## Try it
+
+```bash
+mdview sample.md
+```
+
+`sample.md` (in this repo) exercises headings, a table, highlighted code, a
+Mermaid diagram, KaTeX math, and a checklist.
+
 ## Use from the terminal
 
 ```bash
 mdview README.md
 ```
+
+Add `?edit` (or `?view`) to the URL to force a starting mode, e.g. open straight
+into the split editor — handy for a second "Edit" Automator app.
 
 By default `mdview` detaches and returns to the prompt immediately; the server
 stops ~12s after you close the browser tab. To force it: `pkill -f 'mdview'`.
@@ -149,6 +163,7 @@ Re-run `./install.sh`. Version pins live at the top of that script.
 mdview        the launcher / local server (Python)
 app.html      the viewer/editor UI (HTML + vanilla JS)
 install.sh    installer + updater
+sample.md     demo document
 ```
 
 The vendored libraries are **not** committed — `install.sh` fetches them.
